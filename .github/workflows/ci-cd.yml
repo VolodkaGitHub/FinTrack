@@ -1,0 +1,164 @@
+# CI/CD монолітного застосунку FinTrack (відповідальний — QA/DevOps-інженер).
+# Kanban: кожен PR проходить колонки Review → Testing лише з «зеленим» конвеєром;
+# злиття в main автоматично публікує образи та (за наявності налаштувань) розгортає продакшн.
+name: CI/CD
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: Backend · тести та збірка (Java 21, Spring Boot)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+          cache-dependency-path: backend/pom.xml
+      - name: Модульні та інтеграційні тести, пороги покриття JaCoCo, збірка jar
+        run: mvn -B verify
+      - name: Звіти тестів і покриття
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: backend-test-reports
+          path: |
+            backend/target/surefire-reports
+            backend/target/site/jacoco
+      - uses: actions/upload-artifact@v7
+        with:
+          name: fintrack-backend-jar
+          path: backend/target/fintrack.jar
+
+  frontend:
+    name: Frontend · лінт, тести, збірка (React)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci --no-audit --no-fund
+      - run: npm run lint
+      - name: Тести з порогами покриття
+        run: npm run test:coverage
+      - run: npm run build
+      - name: Звіт покриття
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: frontend-coverage
+          path: frontend/coverage
+      - uses: actions/upload-artifact@v7
+        with:
+          name: fintrack-frontend-dist
+          path: frontend/dist
+
+  e2e:
+    name: E2E · Playwright проти зібраного стеку
+    needs: [backend, frontend]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Запуск FinTrack (PostgreSQL, backend, nginx + SPA, Mailpit)
+        run: docker compose up -d --build --wait
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: e2e/package-lock.json
+      - run: npm ci --no-audit --no-fund
+        working-directory: e2e
+      - run: npx playwright install --with-deps chromium
+        working-directory: e2e
+      - name: Наскрізні сценарії (API, браузер, мобільна версія)
+        run: npx playwright test
+        working-directory: e2e
+      - name: Звіт Playwright
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: playwright-report
+          path: e2e/playwright-report
+      - name: Журнали сервісів при збої
+        if: failure()
+        run: docker compose logs backend frontend
+      - name: Зупинка стеку
+        if: always()
+        run: docker compose down -v
+
+  docker:
+    name: Docker-образи → GitHub Container Registry
+    needs: [backend, frontend, e2e]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      matrix:
+        component: [backend, frontend]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: docker/setup-buildx-action@v4
+      - uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - id: meta
+        uses: docker/metadata-action@v6
+        with:
+          images: ghcr.io/${{ github.repository }}/${{ matrix.component }}
+          tags: |
+            type=sha,format=short
+            type=raw,value=latest
+      - uses: docker/build-push-action@v7
+        with:
+          context: ${{ matrix.component }}
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=${{ matrix.component }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.component }}
+
+  deploy:
+    name: Розгортання на production-сервер
+    needs: docker
+    # вмикається, коли в налаштуваннях репозиторію задано змінну DEPLOY_HOST і секрети DEPLOY_USER / DEPLOY_SSH_KEY
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.DEPLOY_HOST != ''
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Ім'я образів у нижньому регістрі
+        run: echo "IMAGE_PREFIX=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_ENV"
+      - uses: appleboy/ssh-action@v1.2.5
+        with:
+          host: ${{ vars.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          envs: IMAGE_PREFIX
+          script: |
+            set -e
+            cd /opt/fintrack
+            docker compose -f docker-compose.yml -f docker-compose.prod.yml pull backend frontend
+            docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --remove-orphans
+            docker image prune -f

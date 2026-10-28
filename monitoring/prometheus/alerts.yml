@@ -1,0 +1,49 @@
+groups:
+  - name: fintrack-production
+    rules:
+      - alert: FinTrackBackendDown
+        expr: up{job="fintrack-backend"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "FinTrack backend недоступний"
+          description: "Prometheus не отримує метрик backend понад 1 хвилину."
+
+      - alert: FinTrackHighErrorRate
+        expr: |
+          sum(rate(http_server_requests_seconds_count{job="fintrack-backend", status=~"5.."}[5m]))
+            / clamp_min(sum(rate(http_server_requests_seconds_count{job="fintrack-backend"}[5m])), 0.001) > 0.05
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Понад 5% запитів завершуються помилкою 5xx"
+          description: "Частка серверних помилок за 5 хвилин: {{ $value | humanizePercentage }}."
+
+      - alert: FinTrackSlowResponses
+        expr: |
+          histogram_quantile(0.95,
+            sum by (le) (rate(http_server_requests_seconds_bucket{job="fintrack-backend", uri!~"/ws.*"}[5m]))) > 1
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "95-й перцентиль часу відповіді API понад 1 с"
+
+      - alert: FinTrackLoginFailuresSpike
+        expr: sum(increase(fintrack_auth_logins_total{result="failure"}[10m])) > 50
+        labels:
+          severity: warning
+        annotations:
+          summary: "Аномально багато невдалих спроб входу (можливий підбір паролів)"
+
+      - alert: FinTrackHighHeapUsage
+        expr: |
+          sum(jvm_memory_used_bytes{job="fintrack-backend", area="heap"})
+            / sum(jvm_memory_max_bytes{job="fintrack-backend", area="heap"} > 0) > 0.9
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Використання heap JVM понад 90%"

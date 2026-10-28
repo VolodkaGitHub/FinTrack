@@ -1,0 +1,16 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:fintrack;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH;DB_CLOSE_DELAY=-1
+    username: sa
+    password:
+
+management:
+  server:
+    port: 0
+
+fintrack:
+  frontend-url: http://localhost:5173
+  mail:
+    enabled: false
+  scheduling:
+    enabled: false

@@ -1,0 +1,185 @@
+{
+  "uid": "fintrack-overview",
+  "title": "FinTrack — стан застосунку",
+  "tags": ["fintrack", "spring-boot"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "30s",
+  "time": { "from": "now-6h", "to": "now" },
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "Backend",
+      "gridPos": { "h": 4, "w": 4, "x": 0, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [{ "refId": "A", "expr": "up{job=\"fintrack-backend\"}" }],
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            { "type": "value", "options": { "0": { "text": "DOWN", "color": "red" }, "1": { "text": "UP", "color": "green" } } }
+          ],
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "red", "value": null }, { "color": "green", "value": 1 }] }
+        }
+      },
+      "options": { "colorMode": "background", "graphMode": "none", "reduceOptions": { "calcs": ["lastNotNull"] } }
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Пристрої онлайн (синхронізація)",
+      "gridPos": { "h": 4, "w": 5, "x": 4, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [{ "refId": "A", "expr": "sum(fintrack_sync_connected_devices)" }],
+      "options": { "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"] } }
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Нові операції за 24 год",
+      "gridPos": { "h": 4, "w": 5, "x": 9, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [{ "refId": "A", "expr": "sum(increase(fintrack_transactions_total[24h]))" }],
+      "options": { "graphMode": "none", "reduceOptions": { "calcs": ["lastNotNull"] } }
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "Звіти PDF/Excel за 24 год",
+      "gridPos": { "h": 4, "w": 5, "x": 14, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [{ "refId": "A", "expr": "sum(increase(fintrack_reports_generated_total[24h]))" }],
+      "options": { "graphMode": "none", "reduceOptions": { "calcs": ["lastNotNull"] } }
+    },
+    {
+      "id": 5,
+      "type": "stat",
+      "title": "Помилки 5xx (5 хв)",
+      "gridPos": { "h": 4, "w": 5, "x": 19, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [{ "refId": "A", "expr": "sum(increase(http_server_requests_seconds_count{job=\"fintrack-backend\",status=~\"5..\"}[5m])) or vector(0)" }],
+      "fieldConfig": {
+        "defaults": { "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "red", "value": 1 }] } }
+      },
+      "options": { "colorMode": "background", "graphMode": "none", "reduceOptions": { "calcs": ["lastNotNull"] } }
+    },
+    {
+      "id": 6,
+      "type": "timeseries",
+      "title": "Запити до API за секунду",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (uri) (rate(http_server_requests_seconds_count{job=\"fintrack-backend\", uri=~\"/api/.*\"}[5m]))",
+          "legendFormat": "{{uri}}"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "reqps" } }
+    },
+    {
+      "id": 7,
+      "type": "timeseries",
+      "title": "Час відповіді API (p95)",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 4 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(http_server_requests_seconds_bucket{job=\"fintrack-backend\", uri=~\"/api/.*\"}[5m])))",
+          "legendFormat": "p95"
+        },
+        {
+          "refId": "B",
+          "expr": "histogram_quantile(0.50, sum by (le) (rate(http_server_requests_seconds_bucket{job=\"fintrack-backend\", uri=~\"/api/.*\"}[5m])))",
+          "legendFormat": "p50"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "s" } }
+    },
+    {
+      "id": 8,
+      "type": "timeseries",
+      "title": "Відповіді за статусом",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 12 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (status) (rate(http_server_requests_seconds_count{job=\"fintrack-backend\"}[5m]))",
+          "legendFormat": "{{status}}"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "reqps" } }
+    },
+    {
+      "id": 9,
+      "type": "timeseries",
+      "title": "Входи до акаунтів",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 12 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (result) (increase(fintrack_auth_logins_total[15m]))",
+          "legendFormat": "{{result}}"
+        }
+      ]
+    },
+    {
+      "id": 10,
+      "type": "timeseries",
+      "title": "Створені операції за джерелом",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 20 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (source) (increase(fintrack_transactions_total[15m]))",
+          "legendFormat": "{{source}}"
+        },
+        {
+          "refId": "B",
+          "expr": "sum(increase(fintrack_import_rows_total[15m]))",
+          "legendFormat": "імпорт CSV"
+        }
+      ]
+    },
+    {
+      "id": 11,
+      "type": "timeseries",
+      "title": "Пам'ять JVM (heap)",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 20 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(jvm_memory_used_bytes{job=\"fintrack-backend\", area=\"heap\"})",
+          "legendFormat": "використано"
+        },
+        {
+          "refId": "B",
+          "expr": "sum(jvm_memory_max_bytes{job=\"fintrack-backend\", area=\"heap\"} > 0)",
+          "legendFormat": "максимум"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "bytes" } }
+    },
+    {
+      "id": 12,
+      "type": "timeseries",
+      "title": "Сповіщення користувачам за типом",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 28 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (type) (increase(fintrack_notifications_sent_total[1h]))",
+          "legendFormat": "{{type}}"
+        }
+      ]
+    }
+  ]
+}

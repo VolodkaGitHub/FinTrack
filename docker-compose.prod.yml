@@ -1,0 +1,19 @@
+# Продакшн-оверрайд: готові образи з GHCR замість локальної збірки, реальний SMTP замість Mailpit.
+#   IMAGE_PREFIX=ghcr.io/<owner>/<repo> docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+services:
+  backend:
+    image: ${IMAGE_PREFIX:?Вкажіть IMAGE_PREFIX, наприклад ghcr.io/owner/fintrack}/backend:${IMAGE_TAG:-latest}
+    build: !reset null
+    depends_on: !override
+      db:
+        condition: service_healthy
+
+  frontend:
+    image: ${IMAGE_PREFIX}/frontend:${IMAGE_TAG:-latest}
+    build: !reset null
+
+  db:
+    ports: !reset []
+
+  mailpit:
+    profiles: ["dev"]

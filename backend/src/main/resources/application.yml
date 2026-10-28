@@ -1,0 +1,103 @@
+spring:
+  application:
+    name: fintrack
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5433/fintrack}
+    username: ${DB_USER:fintrack}
+    password: ${DB_PASSWORD:fintrack}
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: none
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC
+  flyway:
+    enabled: true
+  mail:
+    host: ${MAIL_HOST:localhost}
+    port: ${MAIL_PORT:1025}
+    username: ${MAIL_USERNAME:}
+    password: ${MAIL_PASSWORD:}
+    properties:
+      mail.smtp.auth: ${MAIL_SMTP_AUTH:false}
+      mail.smtp.starttls.enable: ${MAIL_STARTTLS:false}
+      mail.smtp.connectiontimeout: 5000
+      mail.smtp.timeout: 5000
+      mail.smtp.writetimeout: 5000
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 11MB
+  mvc:
+    problemdetails:
+      enabled: true
+    format:
+      date: iso
+
+server:
+  port: 8080
+  forward-headers-strategy: framework
+  shutdown: graceful
+
+management:
+  server:
+    port: 8081
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: always
+  metrics:
+    tags:
+      application: fintrack
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
+  info:
+    env:
+      enabled: true
+
+info:
+  app:
+    name: FinTrack
+    description: Облік особистих і сімейних фінансів
+    version: '@project.version@'
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    operations-sorter: alpha
+    tags-sorter: alpha
+
+fintrack:
+  frontend-url: ${FRONTEND_URL:http://localhost:5173}
+  timezone: ${APP_TIMEZONE:Europe/Kyiv}
+  cors-allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173,http://localhost:8088}
+  jwt:
+    secret: ${JWT_SECRET:dev-only-secret-change-me-0123456789abcdef0123456789}
+    access-token-ttl: ${JWT_ACCESS_TTL:15m}
+    refresh-token-ttl: ${JWT_REFRESH_TTL:30d}
+  mail:
+    enabled: ${MAIL_ENABLED:true}
+    from: ${MAIL_FROM:FinTrack <no-reply@fintrack.local>}
+    verification-ttl: 24h
+  oauth2:
+    google:
+      client-id: ${GOOGLE_CLIENT_ID:}
+      client-secret: ${GOOGLE_CLIENT_SECRET:}
+  scheduling:
+    enabled: ${SCHEDULING_ENABLED:true}
+    recurring-cron: "0 5 0 * * *"
+    budget-period-cron: "0 10 0 1 * *"
+
+logging:
+  level:
+    com.fintrack: INFO

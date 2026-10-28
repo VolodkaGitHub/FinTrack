@@ -1,0 +1,12 @@
+body {
+  -webkit-font-smoothing: antialiased;
+}
+
+/* recharts: підписи осей і легенди читабельні в обох темах */
+.recharts-legend-item-text {
+  color: var(--mantine-color-text) !important;
+}
+
+.recharts-cartesian-grid line {
+  stroke: var(--mantine-color-default-border);
+}
