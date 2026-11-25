@@ -142,16 +142,17 @@ export default function RecurringPage() {
                         )}
                       </Table.Td>
                       <Table.Td>
+                        {/* miw: без нього таблиця стискає колонку, і текст бейджа обрізається трикрапкою */}
                         {!r.active ? (
-                          <Badge color="gray" variant="light">
+                          <Badge color="gray" variant="light" miw="max-content">
                             призупинено
                           </Badge>
                         ) : overdue ? (
-                          <Badge color="red" variant="light">
+                          <Badge color="red" variant="light" miw="max-content">
                             прострочено · {formatDate(r.nextDate)}
                           </Badge>
                         ) : dueToday ? (
-                          <Badge color="orange" variant="light">
+                          <Badge color="orange" variant="light" miw="max-content">
                             сьогодні
                           </Badge>
                         ) : (
@@ -159,7 +160,7 @@ export default function RecurringPage() {
                         )}
                       </Table.Td>
                       <Table.Td>
-                        <Badge variant="light" color={r.autoCreate ? 'blue' : 'grape'}>
+                        <Badge variant="light" color={r.autoCreate ? 'blue' : 'grape'} miw="max-content">
                           {r.autoCreate ? 'автоматично' : 'нагадування'}
                         </Badge>
                       </Table.Td>
